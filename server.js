@@ -1,10 +1,9 @@
 const express = require('express');
 const cors = require('cors');
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
-// COLOQUE A SUA CHAVE DA SEDEPAY AQUI
-const CHAVE_SEDEPAY = "sk_live_edc3026a5236a799fd5eab913580a965870fa6f8f8e14a32";
+const CHAVE_SEDEPAY = process.env.SEDEPAY_TOKEN;
 
 app.use(cors());
 app.use(express.json());
@@ -20,7 +19,6 @@ app.post('/api/gerar-pix', async (req, res) => {
     const referencia = "driverexpert-" + Math.floor(Math.random()*999999);
     const tokenAutorizacao = "Bearer " + CHAVE_SEDEPAY;
 
-    // ✅ URL CORRETA DA SEDEPAY (COM S NO FINAL charges)
     const URL_SEDEPAY = "https://api.sedepay.com/v1/pix/charges";
 
     const respostaSedepay = await fetch(URL_SEDEPAY, {
@@ -29,7 +27,6 @@ app.post('/api/gerar-pix', async (req, res) => {
         "Content-Type":"application/json",
         "Authorization": tokenAutorizacao
       },
-      // ✅ ESTRUTURA EXATA DA DOCUMENTAÇÃO DA SEDEPAY
       body: JSON.stringify({
         amount: amount,
         reference: referencia,
