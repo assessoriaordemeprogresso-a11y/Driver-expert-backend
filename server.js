@@ -1,63 +1,95 @@
-const express = require('express');
-const cors = require('cors');
-const app = express();
-const PORT = 3000;
+require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
+const axios = require("axios");
 
-// COLOQUE A SUA CHAVE DA SEDEPAY AQUI
-const CHAVE_SEDEPAY = "sk_live_edc3026a5236a799fd5eab913580a965870fa6f8f8e14a32";
+const app = express();
+const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
 
-app.get('/', (req, res) => {
-  res.send("Servidor online!");
+// ===== ROTAS =====
+// 1. CRIAR PIX COBRANÇA SEDEPAY
+app.post("/api/criar-pix", async (req, res) => {
+  try {
+    const SEDEPAY_API_KEY = process.env.SEDEPAY_API_KEY;
+    const SEDEPAY_BASE_URL = process.env.SEDEPAY_BASE_URL;
+
+    if (!SEDEPAY_API_KEY || !SEDEPAY_BASE_URL) {
+      return res.status(500).json({ erro: "Variáveis .env da SedePay faltando" });
+    }
+
+    const dados = req.body;
+
+    const payload = {
+      amount: dados.amount,
+      reference: dados.reference,
+      product: { title: dados.product_title },
+      customer: {
+        name: dados.customer_name,
+        email: dados.customer_email,
+        phone: dados.customer_phone,
+        document: {
+          type: dados.doc_type,
+          number: dados.doc_number
+        }
+      }
+    };
+
+    const resposta = await axios.post(
+      `${SEDEPAY_BASE_URL}/v1/pix/charges`,
+      payload,
+      {
+        headers: {
+          Authorization: `Bearer ${SEDEPAY_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        timeout: 20000
+      }
+    );
+
+    return res.status(201).json(resposta.data);
+  } catch (erro) {
+    return res.status(erro.response?.status || 502).json({
+      erro: "Falha na comunicação com SedePay",
+      detalhe: erro.response?.data || erro.message
+    });
+  }
 });
 
-app.post('/api/gerar-pix', async (req, res) => {
-  console.log("✅ RECEBI A SOLICITAÇÃO DO SITE");
-  try{
-    const {amount, titulo, nome, email, telefone, cpf} = req.body;
-    const referencia = "driverexpert-" + Math.floor(Math.random()*999999);
-    const tokenAutorizacao = "Bearer " + CHAVE_SEDEPAY;
+// 2. CONSULTAR STATUS DO PIX
+app.get("/api/consulta-pix/:reference", async (req, res) => {
+  try {
+    const SEDEPAY_API_KEY = process.env.SEDEPAY_API_KEY;
+    const SEDEPAY_BASE_URL = process.env.SEDEPAY_BASE_URL;
+    const { reference } = req.params;
 
-    // ✅ URL CORRETA DA SEDEPAY (COM S NO FINAL charges)
-    const URL_SEDEPAY = "https://api.sedepay.com/v1/pix/charges";
+    const resposta = await axios.get(`${SEDEPAY_BASE_URL}/v1/pix/charges/${reference}`, {
+      headers: { Authorization: `Bearer ${SEDEPAY_API_KEY}` },
+      timeout: 20000
+    });
 
-    const respostaSedepay = await fetch(URL_SEDEPAY, {
-      method:"POST",
-      headers:{
-        "Content-Type":"application/json",
-        "Authorization": tokenAutorizacao
-      },
-      // ✅ ESTRUTURA EXATA DA DOCUMENTAÇÃO DA SEDEPAY
-      body: JSON.stringify({
-        amount: amount,
-        reference: referencia,
-        product: {
-          title: titulo
-        },
-        customer: {
-          name: nome,
-          email: email,
-          phone: telefone,
-          document: {
-            type: "cpf",
-            number: cpf
-          }
-        }
-      })
-    })
-
-    const dadosSedepay = await respostaSedepay.json();
-    console.log("📥 Retorno Sedepay: ", dadosSedepay);
-    res.json(dadosSedepay);
-
-  }catch(err){
-    console.log("❌ ERRO NO SERVIDOR: ", err.message);
-    res.status(500).json({erro: err.message});
+    return res.status(200).json(resposta.data);
+  } catch (erro) {
+    return res.status(erro.response?.status || 502).json({
+      erro: "Falha ao consultar PIX",
+      detalhe: erro.response?.data || erro.message
+    });
   }
-})
+});
 
-app.listen(PORT, ()=>{
-  console.log("✅ Servidor rodando na porta " + PORT);
-})
+// 3. WEBHOOK (DEPOIS CONFIGURAR NA SEDEPAY)
+app.post("/webhooks/sedepay", (req, res) => {
+  console.log("WEBHOOK SEDEPAY:", req.body);
+  return res.status(200).json({ status: "ok" });
+});
+
+// TESTE SERVIDOR RODANDO
+app.get("/", (req, res) => {
+  res.send("✅ Servidor Driver Expert rodando!");
+});
+
+app.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT}`);
+});
