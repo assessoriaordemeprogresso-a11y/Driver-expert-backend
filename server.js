@@ -16,6 +16,12 @@ app.post('/api/gerar-pix', async (req, res) => {
   console.log("✅ RECEBI A SOLICITAÇÃO DO SITE");
   try{
     const {amount, titulo, nome, email, telefone, cpf} = req.body;
+
+    // LIMPEZA DOS DADOS PARA SEDEPAY
+    const cpfLimpo = String(cpf || "").replace(/\D/g, "")
+    const telefoneLimpo = String(telefone || "").replace(/\D/g, "")
+    const valorLimpo = Number(String(amount || "0").replace(",", "."))
+
     const referencia = "driverexpert-" + Math.floor(Math.random()*999999);
     const tokenAutorizacao = "Bearer " + CHAVE_SEDEPAY;
 
@@ -28,7 +34,7 @@ app.post('/api/gerar-pix', async (req, res) => {
         "Authorization": tokenAutorizacao
       },
       body: JSON.stringify({
-        amount: amount,
+        amount: valorLimpo,
         reference: referencia,
         product: {
           title: titulo
@@ -36,10 +42,10 @@ app.post('/api/gerar-pix', async (req, res) => {
         customer: {
           name: nome,
           email: email,
-          phone: telefone,
+          phone: telefoneLimpo,
           document: {
             type: "cpf",
-            number: cpf
+            number: cpfLimpo
           }
         }
       })
